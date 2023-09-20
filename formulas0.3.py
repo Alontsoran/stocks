@@ -1,12 +1,55 @@
 import pandas as pd
+import pyodbc
+
+#פונקצת הבאת המפתחות להתחברות לשרת, כרגע זה דרך SSMS בהמשך נצתרך את זה דרך AWS ישירות
+def get_connection_string_from_file(filename):
+    # קריאה מהקובץ
+    with open(filename, 'r') as file:
+        credentials = {}
+        lines = file.readlines()
+        for line in lines:
+            key, value = line.strip().split('=')
+            credentials[key] = value
+    
+    # יצירת מחרוזת ההתחברות
+    conn_str = (
+        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"SERVER={credentials['server']};"
+        f"DATABASE={credentials['database']};"
+        f"UID={credentials['username']};"
+        f"PWD={credentials['password']};"
+    )
+    
+    return conn_str
 
 
-##מקבל את הקובץ של הנתונים ואת הקובץ של מספרי המניות יוצר המלצה ושומר עם שם המניה
-# Load the data
-data = pd.read_excel("C:/Users/zvi25/Downloads/microsoft.microsoftskydrive_8wekyb3d8bbwe!App/Downloads/נתונים מסודרים לבדיקות.xlsx")
+## הבאת הנתונים
+def fetch_data_for_stock(connection_string, stock_name):
+    """
+    פונקציה המקבלת מחרוזת התחברות ומספר מניה,
+    מבצעת שאילתה לבסיס הנתונים לפי מספר המניה ומחזירה את התוצאות.
+    """
+    # יצירת השאילתה
+    query = f"SELECT revenues, profits, Report_Type FROM [dbo].[122] WHERE Unnamed_23 = N'{stock_name}'"
 
-# Load the securities market data with the correct columns and skipping the header rows
-securities_data = pd.read_csv("C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/data/securitiesmarketdata - Copy.csv", skiprows=2, usecols=[0, 2], names=["Name", "Stock Number"], dtype={"Stock Number": str})
+    
+    # יצירת החיבור לבסיס הנתונים
+    conn = pyodbc.connect(connection_string)
+    cursor = conn.cursor()
+
+    # ביצוע השאילתה
+    cursor.execute(query)
+    rows = cursor.fetchall()
+
+    # סגירת החיבור
+    cursor.close()
+    conn.close()
+    
+    return rows
+
+
+
+
 
 def evaluate_stock_recommendation(stock_data):
     # Check if the data is complete for both revenues and profits
@@ -70,25 +113,17 @@ def evaluate_stock_recommendation(stock_data):
     
     return recommendation
 
-# Extract unique stock numbers
-unique_stock_numbers = data["Stock Number"].unique()
+### שימוש בפונקציה של המפתח, לכאן צריך להכניס את הנתיב של קובץ ההתחברות
+connection_string = get_connection_string_from_file('C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/Milestones/2/2.1/keys.txt')
 
-# Evaluate recommendation for each stock and save results to a list
-results_list = []
+# שימוש בפונקציה ליבוא הנתונים
+stock_number = '''מנועי בית שמש אחזקות (1997) בע"מ'''  # לדוגמה
+results = fetch_data_for_stock(connection_string, stock_number)
 
-for stock_number in unique_stock_numbers:
-    stock_data = data[data["Stock Number"] == stock_number]
-    recommendation = evaluate_stock_recommendation(stock_data)
-    results_list.append({"Stock Number": stock_number, "Recommendation": recommendation})
+for row in results:
+    print(row)
+    print('\n')
 
-results = pd.DataFrame(results_list)
-
-# Convert "Stock Number" column to string type for merging
-results["Stock Number"] = results["Stock Number"].astype(str)
-
-# Merge the recommendations with the securities data to get the stock name
-final_data = pd.merge(results, securities_data, on="Stock Number", how="left")
-
-# Save the final results to an Excel file
-final_data.to_excel("C:/Users/zvi25/Desktop/risult.xlsx", index=False)
+#הפעלת התחזית
+#print(evaluate_stock_recommendation(stock_data))
 print('***The job is done***')
