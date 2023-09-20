@@ -8,9 +8,6 @@ import time
 
 # Path to your URLs Excel file
 url_excel_path = "C:\\Users\\alont\\OneDrive\\ezway\\links.xlsx"
-
-
-
 def download_and_get_soup(url):
     response = requests.get(url)
     if response.status_code == 200:
