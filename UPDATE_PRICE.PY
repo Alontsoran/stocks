@@ -5,6 +5,7 @@ from datetime import datetime
 import openpyxl
 
 
+
 # Load DB details from keys.txt
 with open('C:/Users/alont/OneDrive/פרויקט עם אלון/keys[2].txt', 'r') as file:
     lines = file.readlines()
