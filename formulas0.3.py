@@ -24,14 +24,13 @@ def get_connection_string_from_file(filename):
 
 
 ## הבאת הנתונים
-def fetch_data_for_stock(connection_string, stock_name):
+def fetch_data_for_stock(connection_string, stock_number):
     """
     פונקציה המקבלת מחרוזת התחברות ומספר מניה,
     מבצעת שאילתה לבסיס הנתונים לפי מספר המניה ומחזירה את התוצאות.
     """
     # יצירת השאילתה
-    query = f"SELECT revenues, profits, Report_Type FROM [dbo].[122] WHERE Unnamed_23 = N'{stock_name}'"
-
+    query = f"SELECT revenues, profits, Report_Type FROM [dbo].[122] WHERE [KEY] = '{stock_number}'"
     
     # יצירת החיבור לבסיס הנתונים
     conn = pyodbc.connect(connection_string)
@@ -167,7 +166,7 @@ def Create_recommendation(stock_number,year=2022):
     
 
 
-stock_number = '''מנועי בית שמש אחזקות (1997) בע"מ'''  # לדוגמה
+key = '514091680'  # לדוגמה
 ##שמירת נתונים לקובץ לצורך בדיקות
 #with open('C:/Users/zvi25/Desktop/results.txt', 'w', encoding='utf-8') as file:
 #    for row in updated_results:
@@ -179,6 +178,6 @@ stock_number = '''מנועי בית שמש אחזקות (1997) בע"מ'''  # ל�
 #        file.write(str(extracted_profits) + '\n')
 
 #קריאה לפונקציה הראשית
-print(Create_recommendation(stock_number))
+print(Create_recommendation(key))
 
 print('***The job is done***')
