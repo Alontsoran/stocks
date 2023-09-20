@@ -1,5 +1,5 @@
-import pandas as pd
 import pyodbc
+import re
 
 #פונקצת הבאת המפתחות להתחברות לשרת, כרגע זה דרך SSMS בהמשך נצתרך את זה דרך AWS ישירות
 def get_connection_string_from_file(filename):
@@ -47,43 +47,77 @@ def fetch_data_for_stock(connection_string, stock_name):
     
     return rows
 
-
-
-
-
-def evaluate_stock_recommendation(stock_data):
-    # Check if the data is complete for both revenues and profits
-    if len(stock_data) != 2:
-        return "DATA INCOMPLETE"
+#סידור לפי שנים ורבעונים
+def split_year_quarter_from_results(results):
+    # יצירת רשימה חדשה לתוצאות המעודכנות
+    updated_results = []
     
-    # Extracting data for the specific stock
-    revenues = stock_data[stock_data["×§×˜×’×•×¨×™×”"] == "הכנסות"]
-    profits = stock_data[stock_data["×§×˜×’×•×¨×™×”"] == "רווח  נקי"]
+    # הולכים על כל שורה בתוצאות
+    for row in results:
+        # משתמשים בביטויים רגולריים לחלוקה לרבעון ושנה
+        match = re.match(r"(רבעון (\d)|שנתי) (\d{4})", row[2])
+        
+        if match:
+            if match.group(1) == "שנתי":
+                quarter_eng = "Q4"
+            else:
+                quarter_eng = f"Q{match.group(2)}"
+            year = int(match.group(3))
+            
+            new_row = (row[0], row[1], quarter_eng, year)
+            updated_results.append(new_row)
+        else:
+            # אם הפורמט אינו תקפי, נשאיר את השורה כפי שהיא
+            updated_results.append(row)
     
+    return updated_results
+
+
+def extract_revenues_profits_by_year(data, year):
+    # רשימות להכנסות ולרווחים
+    # איתחול הרשימות
+    revenues = []
+    profits = []
+
+    # הבאת הנתונים הרלוונטיים
+    relevant_data = [row for row in data if row[3] == year or (row[3] == year - 1 and row[2] == 'Q4')]
+
+    # מיון הנתונים לפי הרבעון והשנה
+    sorted_data = sorted(relevant_data, key=lambda x: (x[3], x[2]))
+
+    # הוספת הנתונים לרשימות המתאימות
+    for row in sorted_data:
+        if row[2] == 'Q1' or row[2] == 'Q2' or row[2] == 'Q3' or row[2] == 'Q4':
+            revenues.append([row[0], row[3], row[2]])
+            profits.append([row[1], row[3], row[2]])
+
+    return revenues, profits
+
+def evaluate_stock_recommendation(revenues, profits,
+                                  B_required_sales_versus_corresponding_quarter=1.2,
+                                  B_required_sales_versus_average=1.2,
+                                  B_required_profit_versus_corresponding_quarter=1.2,
+                                  B_required_profit_versus_average=1.2,
+                                  B_min_profit=0.03,
+                                  S_required_sales_versus_corresponding_quarter=0.8,
+                                  S_required_sales_versus_average=0.8,
+                                  S_required_profit_versus_corresponding_quarter=0.7,
+                                  S_required_profit_versus_average=0.7,
+                                  S_min_profit=0.03):
+
+  
     # Assign values based on the provided code
-    Q_N_sales = revenues.iloc[0, 1]
-    Q_N_profit = profits.iloc[0, 1]
-    Q_minus1_sales = revenues.iloc[0, 2]
-    Q_minus1_profit = profits.iloc[0, 2]
-    Q_minus2_sales = revenues.iloc[0, 3]
-    Q_minus2_profit = profits.iloc[0, 3]
-    Q_minus3_sales = revenues.iloc[0, 4]
-    Q_minus3_profit = profits.iloc[0, 4]
-    Q_minus4_sales = revenues.iloc[0, 5]
-    Q_minus4_profit = profits.iloc[0, 5]
-    
-    # Provided decision parameters
-    B_required_sales_versus_corresponding_quarter = 1.2
-    B_required_sales_versus_average = 1.2
-    B_required_profit_versus_corresponding_quarter = 1.2
-    B_required_profit_versus_average = 1.2
-    B_min_profit = 0.03
+    Q_N_sales = revenues[4][0]
+    Q_N_profit = profits[4][0]
+    Q_minus1_sales = revenues[3][0]
+    Q_minus1_profit = profits[3][0]
+    Q_minus2_sales = revenues[2][0]
+    Q_minus2_profit = profits[2][0]
+    Q_minus3_sales = revenues[1][0]
+    Q_minus3_profit = profits[1][0]
+    Q_minus4_sales = revenues[0][0]
+    Q_minus4_profit = profits[0][0]
 
-    S_required_sales_versus_corresponding_quarter = 0.8
-    S_required_sales_versus_average = 0.8
-    S_required_profit_versus_corresponding_quarter = 0.7
-    S_required_profit_versus_average = 0.7
-    S_min_profit = 0.03
 
     # Calculate the average sales and profit from the previous year
     average_sales_previous_year = (Q_minus1_sales + Q_minus2_sales + Q_minus3_sales + Q_minus4_sales) / 4
@@ -113,17 +147,38 @@ def evaluate_stock_recommendation(stock_data):
     
     return recommendation
 
-### שימוש בפונקציה של המפתח, לכאן צריך להכניס את הנתיב של קובץ ההתחברות
-connection_string = get_connection_string_from_file('C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/Milestones/2/2.1/keys.txt')
 
-# שימוש בפונקציה ליבוא הנתונים
+def Create_recommendation(stock_number,year=2022):
+    ### שימוש בפונקציה של המפתח, לכאן צריך להכניס את הנתיב של קובץ ההתחברות
+    #מפתח בררת מחדל
+    connection_string = get_connection_string_from_file('C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/Milestones/2/2.1/keys.txt')
+
+    # שימוש בפונקציה ליבוא הנתונים
+    results = fetch_data_for_stock(connection_string, stock_number)
+
+    #פיצול המידע
+    updated_results = split_year_quarter_from_results(results)
+
+    # יצירת רשימות
+    extracted_revenues, extracted_profits = extract_revenues_profits_by_year(updated_results, year)
+
+    #הפעלת התחזית
+    return evaluate_stock_recommendation(extracted_revenues, extracted_profits)
+    
+
+
 stock_number = '''מנועי בית שמש אחזקות (1997) בע"מ'''  # לדוגמה
-results = fetch_data_for_stock(connection_string, stock_number)
+##שמירת נתונים לקובץ לצורך בדיקות
+#with open('C:/Users/zvi25/Desktop/results.txt', 'w', encoding='utf-8') as file:
+#    for row in updated_results:
+#        file.write(str(row) + '\n')
 
-for row in results:
-    print(row)
-    print('\n')
+##שמירת נתונים לקובץ לצורך בדיקות
+#with open('C:/Users/zvi25/Desktop/results.txt', 'w', encoding='utf-8') as file:
+#       file.write(str(extracted_revenues) + '\n')
+#        file.write(str(extracted_profits) + '\n')
 
-#הפעלת התחזית
-#print(evaluate_stock_recommendation(stock_data))
+#קריאה לפונקציה הראשית
+print(Create_recommendation(stock_number))
+
 print('***The job is done***')
