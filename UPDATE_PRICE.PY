@@ -3,10 +3,10 @@ import schedule
 import time
 from datetime import datetime
 import openpyxl
-
+import os
 
 # Load DB details from keys.txt
-with open('C:/Users/alont/OneDrive/פרויקט עם אלון/keys[2].txt', 'r') as file:
+with open('C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/Milestones/2/2.1/keys.txt', 'r', encoding='utf-8') as file:
     lines = file.readlines()
     db_details = {line.split('=')[0]: line.split('=')[1].strip() for line in lines}
 
@@ -15,22 +15,29 @@ wb = openpyxl.Workbook()
 ws = wb.active
 
 # Use the STOCKHISTORY function in cell B1 to get historical data from A1 (stock symbol)
-ws['B1'] = '=STOCKHISTORY(A1, TODAY(), TODAY())'
+ws['B1'] = '=STOCKHISTORY(A1, TODAY(),TODAY(),0,0,1)'
 
-wb.save('stock_history.xlsx')
+desktop_path = os.path.join(os.path.expanduser('~'), 'Desktop')
+file_path = os.path.join(desktop_path, 'stock_history.xlsx')
+wb.save(file_path)
 
 def update_stock_price(stock_name):
     # Open the existing Excel file
-    wb = openpyxl.load_workbook('stock_history.xlsx')
+    wb = openpyxl.load_workbook(file_path)
     ws = wb.active
 
     # Insert the stock symbol into Excel
     ws['A1'] = f'"{stock_name}"'
-    wb.save('stock_history.xlsx')
+    wb.save(file_path)
     
-    # Assume Excel calculates the price automatically in cell B1
-    # Here we simulate it for the example
-    stock_price = ws['B1'].value
+    # Assume Excel calculates the price automatically in cell B2 (or whatever cell the value is in)
+    stock_price = ws['B2'].value  # Change this to the appropriate cell if it's not B2
+    
+    # Print the current value from Excel for verification
+    print(f"Current value for {stock_name}: {stock_price}")
+
+    # Ensure the value is float
+    stock_price = float(stock_price)
     
     # Connect to the database and update the stock price
     conn_str = (
@@ -42,10 +49,17 @@ def update_stock_price(stock_name):
     )
     conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
+    
+    # Get the current date and time in the format "dd_mm_yyyy_hh_mm"
+    current_datetime = datetime.now().strftime("%d_%m_%Y_%H_%M")
+    
+    # Add a new column without checking if it exists
+    add_column_query = f"ALTER TABLE stocks_prices ADD [{current_datetime}] FLOAT"
+    cursor.execute(add_column_query)
 
-    update_query = f"UPDATE stocks_prices SET StockPrice = ?, LastUpdated = ? WHERE Stock_name = ?"
-    last_updated = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    cursor.execute(update_query, (stock_price, last_updated, stock_name))
+    # Update the stock price for the current datetime
+    update_query = f"UPDATE stocks_prices SET [{current_datetime}] = ? WHERE Stock_name = ?"
+    cursor.execute(update_query, (stock_price, stock_name))
     conn.commit()
 
     cursor.close()
@@ -73,7 +87,7 @@ def check_and_update_stock_prices():
     conn.close()
 
 # Schedule the function to run every 30 minutes
-schedule.every(30).minutes.do(check_and_update_stock_prices)
+schedule.every(0.1).minutes.do(check_and_update_stock_prices)
 
 while True:
     schedule.run_pending()
