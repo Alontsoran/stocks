@@ -59,12 +59,12 @@ def check_and_update_stock_prices():
             print(f"Failed to update stock price for {stock_name}: {e}")
 
 # Schedule the function to run every 5 minutes
-schedule.every(5).minutes.do(check_and_update_stock_prices)
+schedule.every(0.1).minutes.do(check_and_update_stock_prices)
 
 try:
     while True:
         schedule.run_pending()
-        time.sleep(1)
+        time.sleep(0.1)
 except KeyboardInterrupt:
     print("Stopping the scheduler...")
 finally:
