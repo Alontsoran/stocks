@@ -1,10 +1,12 @@
 import yfinance as yf
+from googlefinance import getQuotes
 import pyodbc
 import schedule
 import time
 from datetime import datetime
 
 def get_stock_price(stock_name):
+    # Try to fetch stock price using your existing methods
     formats = [stock_name, f"{stock_name}.TA", f"{stock_name}:TLV", f"TLV:{stock_name}"]
     
     for stock_format in formats:
@@ -17,10 +19,19 @@ def get_stock_price(stock_name):
                 return float(latest_close_price)
         except Exception as e:
             print(f"Failed to get stock price for {stock_format}: {e}")
-            
+    
+    # If your existing methods fail, try to fetch using googlefinance as a fallback
+    try:
+        stock_quote = getQuotes(stock_name)
+        if stock_quote:
+            # Extract the 'LastTradePrice' from the quote
+            last_trade_price = float(stock_quote[0]['LastTradePrice'])
+            return last_trade_price
+    except Exception as e:
+        print(f"Failed to get stock price for {stock_name} with Google Finance: {e}")
+    
     print(f"Failed to get stock price for {stock_name} with any format")
     return None
-
 
 with open('C:/Users/alont/OneDrive/פרויקט עם אלון/keys.txt', 'r') as file:
     lines = file.readlines()
@@ -60,7 +71,7 @@ def check_and_update_stock_prices():
             print(f"Failed to update stock price for {stock_name}: {e}")
 
 # Schedule the function to run every 5 minutes
-schedule.every(0.2).minutes.do(check_and_update_stock_prices)
+schedule.every(5).minutes.do(check_and_update_stock_prices)
 
 try:
     while True:
