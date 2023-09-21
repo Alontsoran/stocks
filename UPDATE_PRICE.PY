@@ -5,19 +5,22 @@ import time
 from datetime import datetime
 
 def get_stock_price(stock_name):
-    formats = [stock_name, f"{stock_name}", f"{stock_name}.TA", f"{stock_name}:TLV", f"TLV:{stock_name}"]
+    formats = [stock_name, f"{stock_name}.TA", f"{stock_name}:TLV", f"TLV:{stock_name}"]
     
     for stock_format in formats:
         try:
             stock = yf.Ticker(stock_format)
             # Get the latest closing price
-            latest_close_price = stock.history(period='1d')['Close'].iloc[-1]
-            return float(latest_close_price)
+            history = stock.history(period='1d')
+            if not history.empty:  # Check if the history DataFrame is not empty
+                latest_close_price = history['Close'].iloc[-1]
+                return float(latest_close_price)
         except Exception as e:
             print(f"Failed to get stock price for {stock_format}: {e}")
             
     print(f"Failed to get stock price for {stock_name} with any format")
     return None
+
 
 with open('C:/Users/alont/OneDrive/פרויקט עם אלון/keys.txt', 'r') as file:
     lines = file.readlines()
