@@ -1,23 +1,21 @@
+import yfinance as yf
 import pyodbc
 import schedule
 import time
 from datetime import datetime
-import requests
 
 def get_stock_price(stock_name):
-    api_key = 'NQXMBYGDZH2DB8VI'
-    formats = [stock_name, f"{stock_name}",f"{stock_name}.TA", f"{stock_name}:TLV", f"TLV:{stock_name}"]
+    formats = [stock_name, f"{stock_name}", f"{stock_name}.TA", f"{stock_name}:TLV", f"TLV:{stock_name}"]
     
     for stock_format in formats:
-        url = f"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={stock_format}&interval=5min&apikey={api_key}"
-        response = requests.get(url)
-        
-        if response.status_code == 200:
-            data = response.json()
-            if "Time Series (5min)" in data:
-                latest_close_price = data['Time Series (5min)'][list(data['Time Series (5min)'].keys())[0]]['4. close']
-                return float(latest_close_price)
-                
+        try:
+            stock = yf.Ticker(stock_format)
+            # Get the latest closing price
+            latest_close_price = stock.history(period='1d')['Close'].iloc[-1]
+            return float(latest_close_price)
+        except Exception as e:
+            print(f"Failed to get stock price for {stock_format}: {e}")
+            
     print(f"Failed to get stock price for {stock_name} with any format")
     return None
 
