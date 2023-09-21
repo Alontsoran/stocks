@@ -6,7 +6,7 @@ import requests
 
 def get_stock_price(stock_name):
     api_key = 'NQXMBYGDZH2DB8VI'
-    formats = [stock_name, f"{stock_name}.TA", f"{stock_name}:TLV", f"TLV:{stock_name}"]
+    formats = [stock_name, f"{stock_name}",f"{stock_name}.TA", f"{stock_name}:TLV", f"TLV:{stock_name}"]
     
     for stock_format in formats:
         url = f"https://www.alphavantage.co/query?function=TIME_SERIES_INTRADAY&symbol={stock_format}&interval=5min&apikey={api_key}"
