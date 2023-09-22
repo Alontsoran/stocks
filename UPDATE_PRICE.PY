@@ -3,17 +3,27 @@ import schedule
 import time
 from datetime import datetime
 import certifi
-from urllib.request import urlopen
 import json
+import ssl
+import re
+
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
 
 
 def get_stock_price(stock_name):
-    stock_name+=".TA"
+    print(f"Getting stock price for {stock_name}")
+    stock_name = re.sub(r'[^\w]', '', stock_name)
+    
     api_key = "728c1b4c2d8218add598fcfc7401f70b"
     url = f"https://financialmodelingprep.com/api/v3/quote-short/{stock_name}?apikey={api_key}"
     
+    context = ssl.create_default_context(cafile=certifi.where())
+    
     try:
-        response = urlopen(url, cafile=certifi.where())
+        response = urlopen(url, context=context)
         data = response.read().decode("utf-8")
         stock_data = json.loads(data)
         
@@ -21,7 +31,7 @@ def get_stock_price(stock_name):
             latest_close_price = float(stock_data[0]['price'])
             return latest_close_price
     except Exception as e:
-        print(f"Failed to get stock price for {stock_name}: {e}")
+        print(f"Failed to get stock price for {stock_name} due to {type(e).__name__}: {e}")
         return None
 
 
@@ -41,6 +51,7 @@ cursor = conn.cursor()
 
 
 def update_stock_price(stock_name):
+    print(f"Updating stock price for {stock_name}")
     stock_price = get_stock_price(stock_name)
     
     if stock_price is not None:
@@ -52,21 +63,23 @@ def update_stock_price(stock_name):
         cursor.execute(update_query, (stock_price, stock_name))
         
         conn.commit()
+        print(f"Database has been updated with the latest price for {stock_name}: {stock_price}")
 
 
 def check_and_update_stock_prices():
+    print("Checking and updating stock prices")
     cursor.execute("SELECT names FROM stockp")
     stock_names = [row.names for row in cursor.fetchall()]
     
     for stock_name in stock_names:
         try:
+            stock_name = stock_name.strip() + ".TA"
             update_stock_price(stock_name)
         except Exception as e:
             print(f"Failed to update stock price for {stock_name}: {e}")
 
-
-# Schedule the function to run every 5 minutes
-schedule.every(0.1).minutes.do(check_and_update_stock_prices)
+print("Script has started. Waiting for the first scheduled run...")
+schedule.every(10).seconds.do(check_and_update_stock_prices)  # For testing purpose
 
 try:
     while True:
