@@ -8,8 +8,9 @@ import json
 
 
 def get_stock_price(stock_name):
+    stock_name+=".TA"
     api_key = "728c1b4c2d8218add598fcfc7401f70b"
-    url = f"https://financialmodelingprep.com/api/v3/quote-short/{stock_name}.TA?apikey={api_key}"
+    url = f"https://financialmodelingprep.com/api/v3/quote-short/{stock_name}?apikey={api_key}"
     
     try:
         response = urlopen(url, cafile=certifi.where())
