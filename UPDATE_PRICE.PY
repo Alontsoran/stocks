@@ -31,7 +31,7 @@ def get_stock_price(stock_name):
         print(f"Failed to get stock price for {stock_name} due to {type(e).__name__}: {e}")
         return None
 
-with open('YOUR_PATH_TO_KEYS/keys.txt', 'r') as file:
+with open('C:/Users/alont/OneDrive/פרויקט עם אלון/keys.txt', 'r') as file:
     lines = file.readlines()
     db_details = {line.split('=')[0]: line.split('=')[1].strip() for line in lines}
 
