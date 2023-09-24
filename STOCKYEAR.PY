@@ -1,5 +1,9 @@
+
+
 import pyodbc
-import requests
+from urllib.request import urlopen
+import certifi
+import json
 from datetime import datetime, timedelta
 
 
@@ -28,34 +32,41 @@ def check_and_create_column(cursor, column_name):
 
 def update_price(cursor, symbol, column_name, price):
     cursor.execute(f"UPDATE stockpyear SET [{column_name}] = {price} WHERE Symbol = '{symbol}'")
+    if cursor.rowcount == 0:  # If no row exists for this symbol, insert a new one
+        cursor.execute(f"INSERT INTO stockpyear (Symbol, [{column_name}]) VALUES ('{symbol}', {price})")
     print(f"Updated {symbol} {column_name} with {price}")
 
 
-def process_dates(cursor, stock_symbols, start_date_str='2018-03-12', end_date_str='2023-09-23'):
-    start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-    end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
-    date = start_date
+def get_jsonparsed_data(url):
+    response = urlopen(url, cafile=certifi.where())
+    data = response.read().decode("utf-8")
+    return json.loads(data)
+
+
+def process_stocks(cursor, stock_symbols, start_date=datetime(2018, 8, 21)):
+    print("Processing stocks...")
+    current_date = start_date
     
-    while date <= end_date:
-        column_name = date.strftime('%Y_%m_%d')
+    while current_date <= datetime.now():
+        column_name = current_date.strftime('%Y_%m_%d')
         check_and_create_column(cursor, column_name)
+        
         for symbol in stock_symbols:
-            symbol_with_suffix = f"{symbol}.TA"
-            url = f"https://financialmodelingprep.com/api/v3/historical-price-full/{symbol_with_suffix}?from={start_date_str}&to={end_date_str}&apikey=728c1b4c2d8218add598fcfc7401f70b"
-            response = requests.get(url)
-            if response.status_code != 200:
-                print(f"Failed to get data for {symbol} on {date}, status code: {response.status_code}")
-                continue
-            data = response.json()
-            historical_data = data.get('historical', [])
-            if not historical_data:
-                print(f"No historical data found for {symbol} on {date}")
-                continue
-            price_date_str = date.strftime('%Y-%m-%d')
-            price = next((item.get('close') for item in historical_data if item['date'] == price_date_str), None)
-            if price is not None:
-                update_price(cursor, symbol, column_name, price)
-        date += timedelta(days=1)
+            symbol_with_suffix = f"{symbol.strip()}.TA"
+            url = f"https://financialmodelingprep.com/api/v3/historical-price-full/{symbol_with_suffix}?apikey=728c1b4c2d8218add598fcfc7401f70b"
+            try:
+                data = get_jsonparsed_data(url)
+                price_date_str = current_date.strftime('%Y-%m-%d')
+                price = next((item.get('close') for item in data.get('historical', []) if item['date'] == price_date_str), None)
+                if price is not None:
+                    update_price(cursor, symbol, column_name, price)
+                else:
+                    print(f"No data found for {symbol} on {price_date_str}")
+            except Exception as e:
+                print(f"Error processing {symbol} on {price_date_str}: {e}")
+        
+        conn.commit()  # Commit the changes to the database after processing each date
+        current_date += timedelta(days=1)
 
 
 def main():
@@ -63,14 +74,14 @@ def main():
         lines = file.readlines()
         db_details = {line.split('=')[0]: line.split('=')[1].strip() for line in lines}
     
+    global conn
     conn = get_db_connection(db_details)
     cursor = conn.cursor()
     stock_symbols = get_stock_symbols(cursor)
     
-    print("Processing dates between 2018-03-12 and 2023-09-23...")
-    process_dates(cursor, stock_symbols)
+    print("Processing stocks starting from 2018-08-21...")
+    process_stocks(cursor, stock_symbols)
     
-    conn.commit()
     conn.close()
 
 
