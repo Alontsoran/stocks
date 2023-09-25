@@ -1,13 +1,14 @@
-
-
 import pyodbc
-from urllib.request import urlopen
-import certifi
-import json
-from datetime import datetime, timedelta
+import requests
+from datetime import datetime
 
-
-def get_db_connection(db_details):
+def update_stock_data():
+    # קריאת פרטי החיבור למסד הנתונים
+    with open('C:/Users/Administrator/Downloads/keys.txt', 'r') as file:
+        lines = file.readlines()
+        db_details = {line.split('=')[0]: line.split('=')[1].strip() for line in lines}
+    
+    # חיבור למסד הנתונים
     conn_str = (
         f"Driver={{ODBC Driver 17 for SQL Server}};"
         f"Server={db_details['server']};"
@@ -15,75 +16,50 @@ def get_db_connection(db_details):
         f"UID={db_details['username']};"
         f"PWD={db_details['password']};"
     )
-    return pyodbc.connect(conn_str)
-
-
-def get_stock_symbols(cursor):
-    cursor.execute("SELECT names FROM stockp")
-    return [row.names for row in cursor.fetchall()]
-
-
-def check_and_create_column(cursor, column_name):
-    cursor.execute(f"SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'stockpyear' AND COLUMN_NAME = '{column_name}'")
-    if not cursor.fetchone():
-        cursor.execute(f"ALTER TABLE stockpyear ADD [{column_name}] FLOAT")
-        print(f"Added column {column_name}")
-
-
-def update_price(cursor, symbol, column_name, price):
-    cursor.execute(f"UPDATE stockpyear SET [{column_name}] = {price} WHERE Symbol = '{symbol}'")
-    if cursor.rowcount == 0:  # If no row exists for this symbol, insert a new one
-        cursor.execute(f"INSERT INTO stockpyear (Symbol, [{column_name}]) VALUES ('{symbol}', {price})")
-    print(f"Updated {symbol} {column_name} with {price}")
-
-
-def get_jsonparsed_data(url):
-    response = urlopen(url, cafile=certifi.where())
-    data = response.read().decode("utf-8")
-    return json.loads(data)
-
-
-def process_stocks(cursor, stock_symbols, start_date=datetime(2018, 8, 21)):
-    print("Processing stocks...")
-    current_date = start_date
-    
-    while current_date <= datetime.now():
-        column_name = current_date.strftime('%Y_%m_%d')
-        check_and_create_column(cursor, column_name)
-        
-        for symbol in stock_symbols:
-            symbol_with_suffix = f"{symbol.strip()}.TA"
-            url = f"https://financialmodelingprep.com/api/v3/historical-price-full/{symbol_with_suffix}?apikey=728c1b4c2d8218add598fcfc7401f70b"
-            try:
-                data = get_jsonparsed_data(url)
-                price_date_str = current_date.strftime('%Y-%m-%d')
-                price = next((item.get('close') for item in data.get('historical', []) if item['date'] == price_date_str), None)
-                if price is not None:
-                    update_price(cursor, symbol, column_name, price)
-                else:
-                    print(f"No data found for {symbol} on {price_date_str}")
-            except Exception as e:
-                print(f"Error processing {symbol} on {price_date_str}: {e}")
-        
-        conn.commit()  # Commit the changes to the database after processing each date
-        current_date += timedelta(days=1)
-
-
-def main():
-    with open('C:/Users/Administrator/Downloads/keys.txt', 'r') as file:
-        lines = file.readlines()
-        db_details = {line.split('=')[0]: line.split('=')[1].strip() for line in lines}
-    
-    global conn
-    conn = get_db_connection(db_details)
+    conn = pyodbc.connect(conn_str)
     cursor = conn.cursor()
-    stock_symbols = get_stock_symbols(cursor)
     
-    print("Processing stocks starting from 2018-08-21...")
-    process_stocks(cursor, stock_symbols)
+    # שליפת שמות המניות ממסד הנתונים מהטבלה החדשה
+    cursor.execute("SELECT Symbol FROM STOCKS")
+    stocks = [row.Symbol for row in cursor.fetchall()]
     
+    # הגדרת נתוני ה-API
+    api_endpoint = "https://financialmodelingprep.com/api/v3/historical-price-full"
+    api_key = "728c1b4c2d8218add598fcfc7401f70b"
+    
+    # טבלת הנתונים
+    table_name = "HistoricalStockPrices1"
+    
+    # קבלת הנתונים ההיסטוריים מה-API
+    for stock in stocks:
+        stock_ta = f"{stock}.TA"  # הוספת הסיומת לשליפת הנתונים מהאתר
+        url = f"{api_endpoint}/{stock_ta}?apikey={api_key}"
+        response = requests.get(url)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'historical' in data:
+                for entry in data['historical']:
+                    date = datetime.strptime(entry['date'], '%Y-%m-%d').date()
+                    closing_price = entry['close']
+                    
+                    # בדיקה אם הנתון כבר קיים בטבלה
+                    cursor.execute(f"SELECT * FROM {table_name} WHERE Symbol = ? AND Date = ?", (stock, date))
+                    existing_row = cursor.fetchone()
+                    
+                    if existing_row:
+                        # אם הנתון כבר קיים - עדכון
+                        cursor.execute(f"UPDATE {table_name} SET ClosePrice = ? WHERE Symbol = ? AND Date = ?", (closing_price, stock, date))
+                    else:
+                        # אם הנתון לא קיים - הוספה
+                        cursor.execute(f"INSERT INTO {table_name} (Symbol, Date, ClosePrice) VALUES (?, ?, ?)", (stock, date, closing_price))
+                    
+                    conn.commit()
+        else:
+            print(f"Failed to fetch data for {stock_ta}")
+    
+    # סגירת החיבור למסד הנתונים
     conn.close()
 
-
 if __name__ == "__main__":
-    main()
+    update_stock_data()
