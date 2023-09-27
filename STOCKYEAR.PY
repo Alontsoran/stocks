@@ -50,9 +50,11 @@ def update_stock_data():
                     if existing_row:
                         # אם הנתון כבר קיים - עדכון
                         cursor.execute(f"UPDATE {table_name} SET ClosePrice = ? WHERE Symbol = ? AND Date = ?", (closing_price, stock, date))
+                        print(f"Updated {stock} data for {date} with closing price {closing_price}")
                     else:
                         # אם הנתון לא קיים - הוספה
                         cursor.execute(f"INSERT INTO {table_name} (Symbol, Date, ClosePrice) VALUES (?, ?, ?)", (stock, date, closing_price))
+                        print(f"Inserted {stock} data for {date} with closing price {closing_price}")
                     
                     conn.commit()
         else:
