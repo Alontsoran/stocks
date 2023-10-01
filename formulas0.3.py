@@ -1,7 +1,7 @@
 import pyodbc
 import re
 import pandas as pd
-
+from sqlalchemy import create_engine
 
 ##משימות
 #לבנות אלגוריטם שבונה המלצה כל חברה לכל רבעון
@@ -122,14 +122,18 @@ def evaluate_stock_recommendation(revenues, profits,
 
 
 
+#מוסיפה את הנתונים לטבלה
+def add_dataframe_to_sql(df, table_name, connection_string):
+    engine = create_engine(connection_string)
+    df.to_sql(table_name, engine, if_exists='append', index=False)
 
 
 
 
 
-###########צריך לסדר כאן הכל
+
 ### שיוצרת המלצה
-def generate_recommendations_for_quarters(connection_string, stock_symbol):
+def generate_recommendations_for_quarters(connection_string, stock_symbol,Update=False):
     # שליפת הנתונים מהפונקציה הראשונה
     data = get_company_data(connection_string, stock_symbol)
     
@@ -139,6 +143,10 @@ def generate_recommendations_for_quarters(connection_string, stock_symbol):
     # יצירת ה-DataFrame
     df = pd.DataFrame(data_list, columns=['symbol', 'reportedCurrency', 'calendarYear', 'period', 'revenue', 'netIncome'])
     df = df.sort_values(by='calendarYear')
+
+    #יצירת עידכון בלבד
+    if Update:
+        df = df.tail(5)  # שמירה רק של החמישה האחרונים
 
     # יצירת רשימה לשמירת התוצאות
     recommendations = []
@@ -151,7 +159,6 @@ def generate_recommendations_for_quarters(connection_string, stock_symbol):
         # בדיקה שיש לנו חמישה רבעונים רצופים
         if sub_df.iloc[4]['calendarYear'] - sub_df.iloc[0]['calendarYear'] <= 1:
             # חישוב ההמלצה
-            print (list(sub_df['revenue']), list(sub_df['netIncome']))
             recommendation = evaluate_stock_recommendation(list(sub_df['revenue']), list(sub_df['netIncome']))
             
             # הוספת ההמלצה לרשימה
@@ -171,30 +178,44 @@ def generate_recommendations_for_quarters(connection_string, stock_symbol):
 
 
 
-
-
-###פונקציה מרכזית
-def New_Create_recommendation(stock_symbol,year=2022):
+###פונקציה מרכזית ליצירת דטא ביס
+def Create_DB():
     ### שימוש בפונקציה של המפתח, לכאן צריך להכניס את הנתיב של קובץ ההתחברות
     #מפתח בררת מחדל
     connection_string = get_connection_string_from_file('C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/קודים לניהול ממסד בזמן אמת/keys.txt')
+    #שם הטבלה שבה שומרים את הנתונים
+    table_name='BasicAlgorithm_Results'
     #כתובת לרשימת המניות
     file_path='C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/קודים לניהול ממסד בזמן אמת/רשימת מניות במאגר.xlsx'
     #מגבש רשימת מניות
     stock_symbols= read_excel_to_symbols(file_path)
 
     for symbol in stock_symbols:
+        print (symbol)
         recommendations_df =generate_recommendations_for_quarters(connection_string, symbol)
+        add_dataframe_to_sql(recommendations_df, table_name, connection_string)
+    
+    print ("The job is done")
 
-############****בדיקות****
+###פונקציה מרכזית ליצירת עידכון
+def Update_DB():
+    ### שימוש בפונקציה של המפתח, לכאן צריך להכניס את הנתיב של קובץ ההתחברות
+    #מפתח בררת מחדל
+    connection_string = get_connection_string_from_file('C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/קודים לניהול ממסד בזמן אמת/keys.txt')
+    #שם הטבלה שבה שומרים את הנתונים
+    table_name='BasicAlgorithm_Results'
+    #כתובת לרשימת המניות
+    file_path='C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/קודים לניהול ממסד בזמן אמת/רשימת מניות במאגר.xlsx'
+    #מגבש רשימת מניות
+    stock_symbols= read_excel_to_symbols(file_path)
 
-# הגדרת הנתיב לקובץ שמכיל את מחרוזת החיבור
-filename = 'C:/Users/zvi25/Desktop/StartUp/פרויקט עם אלון/קודים לניהול ממסד בזמן אמת/keys.txt'  # שנה לנתיב המתאים של הקובץ
+    for symbol in stock_symbols:
+        recommendations_df =generate_recommendations_for_quarters(connection_string, symbol,Update=True)
+        add_dataframe_to_sql(recommendations_df, table_name, connection_string)
+    
+    print ("The job is done")
 
-# קריאה לפונקציה כדי לקבל את מחרוזת החיבור
-connection_str = get_connection_string_from_file(filename)
+#הרצת הקוד המרכזי ליצירת מאגר
+Create_DB()
 
-recommendations = generate_recommendations_for_quarters(connection_str, "ICL")
 
-# הדפסת ההמלצות
-print(recommendations)
