@@ -158,7 +158,7 @@ def generate_recommendations_for_quarters(connection_string, stock_symbol):
             recommendations.append({
                 'shelet_symbol': stock_symbol,
                 'reportedCurrency': sub_df.iloc[4]['reportedCurrency'],
-                'year': sub_df.iloc[4]['calendarYear'] + (1 if sub_df.iloc[4]['period'] == 'Q4' else 0),
+                'year': sub_df.iloc[4]['calendarYear'] + (1 if sub   _df.iloc[4]['period'] == 'Q4' else 0),
                 'period': 'Q1' if sub_df.iloc[4]['period'] == 'Q4' else f"Q{int(sub_df.iloc[4]['period'][1]) + 1}",
                 'recommendation': recommendation
             })
@@ -170,7 +170,7 @@ def generate_recommendations_for_quarters(connection_string, stock_symbol):
 
 
 
-
+ 
 
 
 ###פונקציה מרכזית

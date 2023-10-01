@@ -4,7 +4,7 @@ from datetime import datetime
 import time
 
 def update_stock_data():
-    with open('C:/Users/Administrator/Downloads/keys.txt', 'r') as file:
+    with open('C:/Users/Administrator/Downloads/keys1.txt', 'r') as file:
         lines = file.readlines()
         db_details = {line.split('=')[0]: line.split('=')[1].strip() for line in lines}
     
@@ -22,14 +22,14 @@ def update_stock_data():
             conn = pyodbc.connect(conn_str)
             cursor = conn.cursor()
             
-            cursor.execute("SELECT Symbol FROM STOCKS")
+            cursor.execute("SELECT Symbol FROM f")
             stocks = [row.Symbol for row in cursor.fetchall()]
             
             api_endpoint = "https://financialmodelingprep.com/api/v3/historical-price-full"
             api_key = "728c1b4c2d8218add598fcfc7401f70b"
 
             
-            table_name = "HistoricalStockPrices1"
+            table_name = "HistoricalStockPrices1tlv"
             
             for stock in stocks:
                 stock_ta = f"{stock}.TA"
